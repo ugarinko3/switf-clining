@@ -7,6 +7,7 @@ from data import password, url_site, email_sender, email_getter
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from counter import counter
+import re
 
 
 def info(message, number_info):
@@ -102,7 +103,7 @@ def summ(message, number, choice):
         summa = 0
         square = int(message.text)
         if number == 0:
-            summa = square * amount_of_slaughter["Разовый клининг"]
+            summa = square * amount_of_slaughter["Мытьё окон, балконов"]
         elif number == 1:
             summa = square * amount_of_slaughter["Поддерживающая уборка"]
         elif number == 2:
@@ -121,8 +122,8 @@ def summ(message, number, choice):
                              .format(title_url['price'][number], summa), parse_mode='html')
             yes_no_click(message, number, choice)
     else:
-        bot.send_message(message.chat.id, 'Произошла ошибка ввода, повторите ещё раз.')
-        yes_no(message, number, choice)
+        bot.send_message(message.chat.id, 'Ошибка, введите площадь в цифрах.')
+        yes_no_click(message, number, choice)
 
 
 """     CLICK       """
@@ -152,13 +153,16 @@ def on_click(message):
         review_site(message)
     elif message.text == message_command[3]:
         info_in_company(message)
+        home_page(message)
     else:
         bot.send_message(message.chat.id, 'Произошла ошибка ввода, повторите ещё раз')
         home_page(message)
 
+def specialist(message):
+    bot.send_message(message.chat.id,f'Специалист: {title_url["company"][0][1]}')
 
 def on_cleaning_click(message):
-    command_choice = ['Разовый клининг', 'Поддерживающая уборка', 'Генеральная уборка', 'Уборка после ремонта',
+    command_choice = ['Мытьё окон, балконов', 'Поддерживающая уборка', 'Генеральная уборка', 'Уборка после ремонта',
                       'Уборка после ЧП', 'Другое', 'Вернуться назад']
     if message.text == command_choice[0]:
         number = 0
@@ -183,7 +187,8 @@ def on_cleaning_click(message):
     elif message.text == command_choice[5]:
         number = 5
         info(message, number)
-        yes_no(message, number, command_choice[5])
+        specialist(message)
+        cleaning(message)
     elif message.text == command_choice[6]:
         home_page(message)
     else:
@@ -206,7 +211,9 @@ def list_order(message, number, summa, square, choice, phone, name, orders):
 def order(message, number, summa, square, choice):
     orders = {}
     name_phone = message.text.split()
-    if len(name_phone) == 2:
+    if message.text == 'Вернуться назад':
+        decor(message, number, summa, square, choice)
+    elif len(name_phone) == 2:
         name = name_phone[0]
         phone = name_phone[1]
         if (phone.isdigit()) and (len(phone) == 11) and ((phone[0] == '7') or (phone[0] == '8')):
@@ -215,6 +222,8 @@ def order(message, number, summa, square, choice):
         else:
             bot.send_message(message.chat.id, 'Номер введен неверно, попробуйте снова')
             decor(message, number, summa, square, choice)
+    elif message.text == 'Вернуться назад':
+        decor(message, number, summa, square, choice)
     else:
         bot.send_message(message.chat.id, 'Ошибка ввода, попробуйте снова')
         decor(message, number, summa, square, choice)
@@ -253,7 +262,7 @@ def yes_no(message, number, choice):
 
 def cleaning(message):
     button = types.ReplyKeyboardMarkup(True)
-    one_time = types.InlineKeyboardButton('Разовый клининг')
+    one_time = types.InlineKeyboardButton('Мытьё окон, балконов')
     supportive = types.InlineKeyboardButton('Поддерживающая уборка')
     button.row(one_time, supportive)
     general = types.InlineKeyboardButton('Генеральная уборка')
@@ -267,6 +276,17 @@ def cleaning(message):
     bot.send_message(message.chat.id, 'Выберите вариант уборки.', reply_markup=button)
     bot.register_next_step_handler(message, on_cleaning_click)
 
+"""INFO IN COMPANY"""
+
+def info_in_company(message):
+    bot.send_message(message.chat.id, f'<b>Иформация о нас:</b>\n'
+                f'<b>{title_url["company"][0][0]}:</b>\n{title_url["company"][0][1]}\n\n'
+                f'<b>{title_url["company"][1][0]}:</b>\n{title_url["company"][1][1]}\n\n'
+                f'<b>{title_url["company"][2][0]}:</b>\n{title_url["company"][2][1]}\n\n'
+                f'<b>{title_url["company"][3][0]}:</b>\n{title_url["company"][3][1]}\n\n'
+                f'<b>{title_url["company"][4][0]}:</b>\n{title_url["company"][4][1]}\n\n'
+                f'<b>{title_url["company"][5][0]}:</b>\n{title_url["company"][5][1]}\n\n',
+                parse_mode='html')
 
 def home_page(message):
     markup = types.ReplyKeyboardMarkup(True)
@@ -279,25 +299,6 @@ def home_page(message):
         markup.add(i_command)
     bot.send_message(message.chat.id, 'Выберите вариант действий.', reply_markup=markup)
     bot.register_next_step_handler(message, on_click)
-
-
-""" function information """
-
-
-def info_in_company(message):
-    bot.send_message(message.chat.id, '<b>Иформация о нас:</b>\n'
-                                      '<b>{}:</b>\n{}\n\n'
-                                      '<b>{}:</b>\n{}\n\n'
-                                      '<b>{}:</b>\n{}\n\n'
-                                      '<b>{}:</b>\n{}\n\n'
-                                      '<b>{}:</b>\n{}\n\n'
-                     .format(title_url['company'][1][0], title_url['company'][1][1],
-                             title_url['company'][2][0], title_url['company'][2][1],
-                             title_url['company'][3][0], title_url['company'][3][1],
-                             title_url['company'][4][0], title_url['company'][4][1],
-                             title_url['company'][5][0], title_url['company'][5][1]), parse_mode='html')
-    home_page(message)
-
 
 if __name__ == '__main__':
     bot = telebot.TeleBot('6916933008:AAH8ayE-T40zuKnMKQzfVk_jeVNWr047ins')
