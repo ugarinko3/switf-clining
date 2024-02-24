@@ -1,21 +1,10 @@
 import telebot
 from telebot import types
-import requests
-from bs4 import BeautifulSoup
-import json
-
-title_url = {}
-url_site = 'https://swift-cleaning.ru/'
-number = 0
-summa = 0
-amount_of_slaughter = [450, 65, 135, 160, 750]
-
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 '
-                  'Safari/537.36'
-}
-
-""""  INFO IN  CLEANING  """
+from search_site import title_url, start_search_site
+import smtplib
+from price_bid import amount_of_slaughter
+from password import password, url_site, email_sender, email_getter
+from email.mime.text import MIMEText
 
 
 def info(message, number_info):
@@ -60,54 +49,34 @@ def info(message, number_info):
                          'Следует переговорить со специалистом', parse_mode='html')
 
 
+""" MESSAGE TELEGRAM """
+
+
+def send_email(message, orders):
+    mess = (f"Новая заявка:\n\nВид услуги: {orders['Type_of_cleaning']}\nИмя: {orders['Name']}\n"
+            f"Телефон: {orders['Number']}\n Площадь М2:{orders['Square']}\n" + "Примерная сумма составила: {:,} рублей"
+            .format(orders['Summa']))
+    bot.send_message(message.chat.id, mess)
+    msg = MIMEText(mess)
+
+    server = smtplib.SMTP("smtp.mail.ru", 587)
+    server.starttls()
+
+    server.login(email_sender, password)
+    server.sendmail(email_sender, email_getter, msg.as_string())
+    bot.send_message(message.chat.id, 'Спасибо, за ваше доверие!')
+    home_page(message)
+
+
 """   SITE    """
-
-
-def search(page, title):
-    soup = BeautifulSoup(page, 'html.parser')
-
-    # Service
-    service = []
-    info_service = []
-    i = 0
-    p_name_tags = soup.find_all('p', class_='textable css79')
-    p_info_tags = soup.find_all('p', class_='textable css81')
-    for tag_info in p_info_tags:
-        info_service.append(tag_info.text)
-    for tag in p_name_tags:
-        list_time = [tag.text, info_service[i]]
-        service.append(list_time)
-        i += 1
-    title['service'] = service
-
-    # Minimal check
-    info_min_price = []
-    span_tags = soup.select('span', class_='textable css87')
-    for i_title in span_tags:
-        for a_tag in i_title:
-            if 'от ' in a_tag:
-                int_number = ''.join(c if c.isdigit() else ' ' for c in a_tag).split()
-                num = int(int_number[0] + int_number[1])
-                info_min_price.append(num)
-    title['price'] = info_min_price
-
-    # Info in cleaning
-    span_info_tags = soup.find_all('p', class_='textable css152')
-    info_company = []
-    for i_span in span_info_tags:
-        split_list = i_span.text.split(':')
-        line_time = [split_list[0], split_list[1]]
-        info_company.append(line_time)
-    title['company'] = info_company
-
-    return title
 
 
 def site(message):
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton('Перейти на сайт', url=url_site))
-    with open('./photo/download.gif', 'rb') as file:
-        bot.send_photo(message.chat.id, file, 'Компания''\t"Swift Clining"', reply_markup=markup)
+    with open('./photo/logo.jpg', 'rb') as file:
+        bot.send_photo(message.chat.id, file, 'Компания''\t<b>"Swift Cleaning</b>"',
+                       reply_markup=markup, parse_mode='HTML')
     home_page(message)
 
 
@@ -115,57 +84,58 @@ def review_site(message):
     url = 'https://yandex.ru/maps/org/svift_klining/182540269027/?ll=82.978281%2C55.044315&z=13'
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton('Перейти на сайт', url=url))
-    bot.reply_to(message, 'Благодарим вас, за ваше доверие к нам!"', reply_markup=markup)
+    with open('./photo/logo2.jpg', 'rb') as file:
+        bot.send_photo(message.chat.id, file, 'Благодарим вас, за ваше доверие к нам!"\nБудем благодарны если'
+                                              ' оставите отзыв!', reply_markup=markup)
     home_page(message)
 
 
 """ SUMMA CHECK """
 
 
-def summ(message):
-    global summa
+def summ(message, number, choice):
     if message.text.isdigit():
+        summa = 0
         square = int(message.text)
         if number == 0:
-            summa = square * amount_of_slaughter[0]
+            summa = square * amount_of_slaughter["Разовый клининг"]
         elif number == 1:
-            summa = square * amount_of_slaughter[1]
+            summa = square * amount_of_slaughter["Поддерживающая уборка"]
         elif number == 2:
-            summa = square * amount_of_slaughter[2]
+            summa = square * amount_of_slaughter["Генеральная уборка"]
         elif number == 3:
-            summa = square * amount_of_slaughter[3]
+            summa = square * amount_of_slaughter["Уборка после ремонта"]
         elif number == 4:
-            summa = square * amount_of_slaughter[4]
+            summa = square * amount_of_slaughter["Уборка после ЧП"]
         if title_url['price'][number] < summa:
             bot.send_message(message.chat.id, 'Примерная сумма составила: <b>{:,}</b> рублей.'.format(summa),
                              parse_mode='html')
-            summary_buttons(message)
+            summary_buttons(message, number, summa, square, choice)
         else:
             bot.send_message(message.chat.id, 'Извините минимальный заказ от <b>{:,}</b> рублей.\n'
                                               'Ваша сумма составила <b>{:,}</b> рублей.'
                              .format(title_url['price'][number], summa), parse_mode='html')
-            yes_no_click(message)
+            yes_no_click(message, number, choice)
     else:
         bot.send_message(message.chat.id, 'Произошла ошибка ввода, повторите ещё раз.')
-        yes_no(message)
+        yes_no(message, number, choice)
 
 
 """     CLICK       """
 
 
-def yes_no_click(message):
-    global number
+def yes_no_click(message, number, choice):
     if message.text.lower() == 'да':
         if number == 0:
             sash = bot.send_message(message.chat.id, 'Сколько оконных створок?')
-            bot.register_next_step_handler(sash, summ)
+            bot.register_next_step_handler(sash, summ, number, choice)
         else:
-            square = bot.send_message(message.chat.id, 'Сколько квадратных метров?')
-            bot.register_next_step_handler(square, summ)
+            square_m2 = bot.send_message(message.chat.id, 'Сколько квадратных метров?')
+            bot.register_next_step_handler(square_m2, summ, number, choice)
     elif message.text.lower() == 'нет':
         cleaning(message)
     else:
-        yes_no(message)
+        yes_no_click(message, number, choice)
 
 
 def on_click(message):
@@ -184,33 +154,32 @@ def on_click(message):
 
 
 def on_cleaning_click(message):
-    global number
     command_choice = ['Разовый клининг', 'Поддерживающая уборка', 'Генеральная уборка', 'Уборка после ремонта',
                       'Уборка после ЧП', 'Другое', 'Вернуться назад']
     if message.text == command_choice[0]:
         number = 0
         info(message, number)
-        yes_no(message)
+        yes_no(message, number, command_choice[0])
     elif message.text == command_choice[1]:
         number = 1
         info(message, number)
-        yes_no(message)
+        yes_no(message, number, command_choice[1])
     elif message.text == command_choice[2]:
         number = 2
         info(message, number)
-        yes_no(message)
+        yes_no(message, number, command_choice[2])
     elif message.text == command_choice[3]:
         number = 3
         info(message, number)
-        yes_no(message)
+        yes_no(message, number, command_choice[3])
     elif message.text == command_choice[4]:
         number = 4
         info(message, number)
-        yes_no(message)
+        yes_no(message, number, command_choice[4])
     elif message.text == command_choice[5]:
         number = 5
         info(message, number)
-        yes_no(message)
+        yes_no(message, number, command_choice[5])
     elif message.text == command_choice[6]:
         home_page(message)
     else:
@@ -218,35 +187,59 @@ def on_cleaning_click(message):
         cleaning(message)
 
 
-def finish(message):
+"""     ORDER   """
+
+
+def order(message, number, summa, square, choice):
+    orders = {}
+    name_phone = message.text.split()
+    if len(name_phone) == 2:
+        name = name_phone[0]
+        phone = name_phone[1]
+        if (phone.isdigit()) and (len(phone) == 11) and ((phone[0] == '7') or (phone[0] == '8')):
+            orders['Number'] = phone
+            orders['Name'] = name
+            orders['Type_of_cleaning'] = choice
+            orders['Summa'] = summa
+            orders['Square'] = square
+            send_email(message, orders)
+        else:
+            bot.send_message(message.chat.id, 'Номер введен неверно, попробуйте снова')
+            finish(message, number, summa, square, choice)
+    else:
+        bot.send_message(message.chat.id, 'Ошибка ввода, попробуйте снова')
+        finish(message, number, summa, square, choice)
+
+
+def finish(message, number, summa, square, choice):
     if message.text == 'Оформить заявку':
-        bot.send_message(message.chat.id, 'В стадии разработки')
-        cleaning(message)
+        name_phone = bot.send_message(message.chat.id, 'Введите Имя и номер телефона')
+        bot.register_next_step_handler(name_phone, order, number, summa, square, choice)
     elif message.text == 'Вернуться назад':
         cleaning(message)
     else:
-        summary_buttons(message)
+        summary_buttons(message, number, summa, square, choice)
 
 
 """   ДОБАВЛЕНИЕ КНОПОК   """
 
 
-def summary_buttons(message):
+def summary_buttons(message, number, summa, square, choice):
     button = types.ReplyKeyboardMarkup(True)
     button_application = types.InlineKeyboardButton('Оформить заявку')
     button_edit = types.InlineKeyboardButton('Вернуться назад')
     button.add(button_application, button_edit)
     bot.send_message(message.chat.id, 'Оформляем заявку?', reply_markup=button)
-    bot.register_next_step_handler(message, finish)
+    bot.register_next_step_handler(message, finish, number, summa, square, choice)
 
 
-def yes_no(message):
+def yes_no(message, number, choice):
     button = types.ReplyKeyboardMarkup(True)
     button_yes = types.InlineKeyboardButton('Да')
     button_no = types.InlineKeyboardButton('Нет')
     button.add(button_yes, button_no)
     bot.send_message(message.chat.id, 'Подходит такая уборка?', reply_markup=button)
-    bot.register_next_step_handler(message, yes_no_click)
+    bot.register_next_step_handler(message, yes_no_click, number, choice)
 
 
 def cleaning(message):
@@ -277,25 +270,6 @@ def home_page(message):
         markup.add(i_command)
     bot.send_message(message.chat.id, 'Выберите вариант действий.', reply_markup=markup)
     bot.register_next_step_handler(message, on_click)
-
-
-""" INPUT IN SITE OF JSON FILE  """
-
-
-def write_inf(data, file_name):
-    data = json.dumps(data)
-    data = json.loads(str(data))
-
-    with open(file_name, 'w', encoding="utf-8") as file:
-        json.dump(data, file, indent=4, ensure_ascii=False)
-
-
-"""start search site"""
-
-
-def start_search_site():
-    search(requests.get(url_site).text, title_url)
-    write_inf(title_url, "info_site/info_site.json")
 
 
 """ function information """
