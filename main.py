@@ -3,8 +3,10 @@ from telebot import types
 from search_site import title_url, start_search_site
 import smtplib
 from price_bid import amount_of_slaughter
-from password import password, url_site, email_sender, email_getter
+from data import password, url_site, email_sender, email_getter
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from counter import counter
 
 
 def info(message, number_info):
@@ -49,16 +51,17 @@ def info(message, number_info):
                          'Следует переговорить со специалистом', parse_mode='html')
 
 
-""" MESSAGE TELEGRAM """
+""" MESSAGE TELEGRAM IN EMAIL  """
 
 
 def send_email(message, orders):
     mess = (f"Новая заявка:\n\nВид услуги: {orders['Type_of_cleaning']}\nИмя: {orders['Name']}\n"
-            f"Телефон: {orders['Number']}\n Площадь М2:{orders['Square']}\n" + "Примерная сумма составила: {:,} рублей"
+            f"Телефон: {orders['Number']}\n Площадь m2:{orders['Square']}\n" + "Примерная сумма составила: {:,} рублей"
             .format(orders['Summa']))
     bot.send_message(message.chat.id, mess)
-    msg = MIMEText(mess)
-
+    msg = MIMEMultipart()
+    msg["Subject"] = f'Telegram Заявка №{counter()}'
+    msg.attach(MIMEText(mess + '\nlogin telegram: @{}'.format(message.from_user.username)))
     server = smtplib.SMTP("smtp.mail.ru", 587)
     server.starttls()
 
@@ -79,6 +82,7 @@ def site(message):
                        reply_markup=markup, parse_mode='HTML')
     home_page(message)
 
+"""  REVIEW SITE  """
 
 def review_site(message):
     url = 'https://yandex.ru/maps/org/svift_klining/182540269027/?ll=82.978281%2C55.044315&z=13'
@@ -135,7 +139,7 @@ def yes_no_click(message, number, choice):
     elif message.text.lower() == 'нет':
         cleaning(message)
     else:
-        yes_no_click(message, number, choice)
+        yes_no(message, number, choice)
 
 
 def on_click(message):
@@ -186,8 +190,17 @@ def on_cleaning_click(message):
         bot.send_message(message.chat.id, 'Произошла ошибка ввода, повторите ещё раз')
         cleaning(message)
 
+"""  DICTIONARY ORDER  """
 
-"""     ORDER   """
+def list_order(message, number, summa, square, choice, phone, name, orders):
+    orders['Number'] = phone
+    orders['Name'] = name
+    orders['Type_of_cleaning'] = choice
+    orders['Summa'] = summa
+    orders['Square'] = square
+
+
+"""    ORDER   """
 
 
 def order(message, number, summa, square, choice):
@@ -197,21 +210,17 @@ def order(message, number, summa, square, choice):
         name = name_phone[0]
         phone = name_phone[1]
         if (phone.isdigit()) and (len(phone) == 11) and ((phone[0] == '7') or (phone[0] == '8')):
-            orders['Number'] = phone
-            orders['Name'] = name
-            orders['Type_of_cleaning'] = choice
-            orders['Summa'] = summa
-            orders['Square'] = square
+            list_order(message, number, summa, square, choice, phone, name, orders)
             send_email(message, orders)
         else:
             bot.send_message(message.chat.id, 'Номер введен неверно, попробуйте снова')
-            finish(message, number, summa, square, choice)
+            decor(message, number, summa, square, choice)
     else:
         bot.send_message(message.chat.id, 'Ошибка ввода, попробуйте снова')
-        finish(message, number, summa, square, choice)
+        decor(message, number, summa, square, choice)
 
 
-def finish(message, number, summa, square, choice):
+def decor(message, number, summa, square, choice):
     if message.text == 'Оформить заявку':
         name_phone = bot.send_message(message.chat.id, 'Введите Имя и номер телефона')
         bot.register_next_step_handler(name_phone, order, number, summa, square, choice)
@@ -230,7 +239,7 @@ def summary_buttons(message, number, summa, square, choice):
     button_edit = types.InlineKeyboardButton('Вернуться назад')
     button.add(button_application, button_edit)
     bot.send_message(message.chat.id, 'Оформляем заявку?', reply_markup=button)
-    bot.register_next_step_handler(message, finish, number, summa, square, choice)
+    bot.register_next_step_handler(message, decor, number, summa, square, choice)
 
 
 def yes_no(message, number, choice):

@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 import requests
-from password import url_site
+from data import url_site
 import json
 
 headers = {
@@ -11,6 +11,8 @@ headers = {
 """"  INFO IN  CLEANING  """
 
 title_url = {}
+
+"""  SEARCH IN SITE  """
 
 
 def write_inf(data, file_name):
