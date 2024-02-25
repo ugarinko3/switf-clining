@@ -68,7 +68,7 @@ def send_email(message, orders):
 
     server.login(email_sender, password)
     server.sendmail(email_sender, email_getter, msg.as_string())
-    bot.send_message(message.chat.id, 'Спасибо, за ваше доверие!')
+    bot.send_message(message.chat.id, 'Спасибо, за ваше доверие!\nМенеджер свяжется с вами в течение 15 минут.')
     home_page(message)
 
 
