@@ -1,4 +1,4 @@
-password = '4hKxXCL0CFaEkkPjAGZ2'
-email_sender = "swiftcleaning@mail.ru"
-email_getter = "Swiftcleaning54@gmail.com"
+password = ''
+email_sender = ""
+email_getter = ""
 url_site = 'https://swift-cleaning.ru/'
